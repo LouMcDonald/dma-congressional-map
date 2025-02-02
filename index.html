@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>D3 Congressional & DMA Maps</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body { margin: 0 50px; font-family: Arial, sans-serif; background: #fdfbe4; }
+        #container { display: flex; height: 100vh; margin: 0 50px; gap: 50px; }
+        .left-column { width: 75%; display: flex; justify-content: center; align-items: center; }
+        .right-column { width: 25%; padding: 20px; background: white; box-shadow: -2px 0 5px rgba(0,0,0,0.1); }
+        .map-container { width: 100%; height: 90vh; position: relative; display: none; }
+        .info-box { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: white; padding: 10px; border-radius: 5px; z-index: 1000; }
+        #info-display { font-family: Arial, sans-serif; background: #fff; padding: 15px; border-radius: 5px; border: 1px solid #ccc; font-size: 16px; white-space: pre-line; }
+        svg { width: 100%; height: 100%; }
+        .district { fill: #e57373; stroke: #b71c1c; stroke-width: 1px; cursor: pointer; }
+        .district:hover { fill: #ff8a80; }
+        .dma { fill: #9bcdef; stroke: #6081c4; stroke-width: 1px; cursor: pointer; }
+        .dma:hover { fill: #b3d9f5; }
+        @media (max-width: 768px) {
+            #container { flex-direction: column; margin: 0; gap: 0; }
+            .left-column, .right-column { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div class="left-column">
+            <div class="map-container" id="map-congress-container">
+                <svg id="map-congress"></svg>
+            </div>
+            <div class="map-container" id="map-dma-container">
+                <svg id="map-dma"></svg>
+            </div>
+        </div>
+        <div class="right-column">
+            <h3>Map Selection</h3>
+            <button onclick="showMap('map-congress')">Congressional Districts</button>
+            <button onclick="showMap('map-dma')">DMA Markets</button>
+            <h3>Selected Region</h3>
+            <div id="info-display">Hover over a district or DMA to see details here.</div>
+        </div>
+    </div>
+
+    <script>
+        function showMap(mapId) {
+            document.querySelectorAll('.map-container').forEach(el => el.style.display = 'none');
+            document.getElementById(mapId + '-container').style.display = 'block';
+        }
+        
+        const width = window.innerWidth * 0.75;
+        const height = window.innerHeight * 0.9;
+    
+        const sharedProjection = d3.geoAlbersUsa()
+            .scale(1200) // Adjust scale to keep consistent
+            .translate([width / 2, height / 2]);
+    
+        function loadMap(svgId, geojsonPath, className) {
+            const svg = d3.select(svgId).attr("viewBox", `0 0 ${width} ${height}`);
+            
+            d3.json(geojsonPath).then(data => {
+                const path = d3.geoPath().projection(sharedProjection);
+                
+                svg.selectAll("path")
+                    .data(data.features)
+                    .enter().append("path")
+                    .attr("d", path)
+                    .attr("class", className)
+                    .on("mouseover", (event, d) => {
+                        let infoText = "";
+                        if (className === 'dma' && d.properties.dma_name) {
+                            infoText += `DMA: ${d.properties.dma_name}\n`;
+                        }
+                        if (className === 'district') {
+                            if (d.properties.congress) {
+                                infoText += `${d.properties.congress}th Congress\n`;
+                            }
+                            if (d.properties.id) {
+                                infoText += `District: ${d.properties.id.slice(2)}\n`;
+                            }
+                            if (d.properties.fips) {
+                                infoText += `State: ${d.properties.id.substring(0,2)}\n`;
+                            }
+                        }
+                        d3.select("#info-display").text(infoText.trim());
+                        d3.select(event.target).style("fill", className === 'dma' ? "#b3d9f5" : "#ff8a80");
+                    })
+                    .on("mouseout", (event) => {
+                        d3.select(event.target).style("fill", className === 'dma' ? "#9bcdef" : "#e57373");
+                    })
+                    .on("click", (event, d) => {
+                        alert(`Clicked on:\n${infoText.trim()}`);
+                    });
+            });
+        }
+    
+        loadMap("#map-congress", "data/congress.geojson", "district");
+        loadMap("#map-dma", "data/nielsen-dma.geojson", "dma");
+        
+        showMap('map-congress');
+    </script>
+</body>
+</html>
